@@ -7,22 +7,12 @@ import requests
 app = FastAPI()
 
 # ================== CONFIGURACIÓN BLOCKCHAIN ==================
+# Lee las variables de entorno de Render [cite: 193]
 
-# Conexión a Sepolia vía Alchemy
-RPC_URL = "https://eth-sepolia.g.alchemy.com/v2/dSfxKDUR1T06yEdb3pPDzA94HzMYgs_e"
-
-# Dirección del contrato
-CONTRACT_ADDRESS = Web3.to_checksum_address(
-    "0x50268060AAd99FEdB907080Ec8138E9f4C5A0e2d"
-)
-
-# Private key de PRUEBA (la que autorizaste usar aquí).
-PRIVATE_KEY = os.environ.get(
-    "PRIVATE_KEY",
-    "2fca43b4cd6c1c0a81494a7f97b2d3c1279d6e895ddfaa29cc0d81222030bf58"
-)
-
-CHAIN_ID = 11155111  # Sepolia
+RPC_URL = os.getenv("RPC_URL")
+CONTRACT_ADDRESS = Web3.to_checksum_address(os.getenv("CONTRACT_ADDRESS"))
+PRIVATE_KEY = os.environ.get("PRIVATE_KEY")
+CHAIN_ID = int(os.getenv("CHAIN_ID", "11155111"))  # Sepolia
 
 # ABI mínimo con la función storeReading(...)
 ABI_JSON = [
@@ -42,19 +32,21 @@ ABI_JSON = [
 ]
 
 # ================== CONFIGURACIÓN PINATA ==================
+# Lee la variable de entorno de Render [cite: 193]
 
-PINATA_JWT = (
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySW5mb3JtYXRpb24iOnsiaWQiOiIwNTAyNDQ5ZS04NWE2LTRkYTItYjQyNC1iZmY4NDY4OTZjYWQiLCJlbWFpbCI6InlhaXJyQHVuaW5vcnRlLmVkdS5jbyIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJwaW5fcG9saWN5Ijp7InJlZ2lvbnMiOlt7ImRlc2lyZWRSZXBsaWNhdGlvbkNvdW50IjoxLCJpZCI6IkZSQTEifSx7ImRlc2lyZWRSZXBsaWNhdGlvbkNvdW50IjoxLCJpZCI6Ik5ZQzEifV0sInZlcnNpb24iOjF9LCJtZmFfZW5hYmxlZCI6ZmFsc2UsInN0YXR1cyI6IkFDVElWRSJ9LCJhdXRoZW50aWNhdGlvblR5cGUiOiJzY29wZWRLZXkiLCJzY29wZWRLZXlLZXkiOiIyZjlhMmE0MmQwYzU1MGE2YTJhOCIsInNjb3BlZEtleVNlY3JldCI6IjhjZjIyNmZmMGJlM2U3Njg3Yjc1YzFlZTFlNGQ3Y2JjN2RhZGM5YTcwMDg0YTkxNGVlYmQ5OWFiYWFhMDVmMzYiLCJleHAiOjE3ODIyNjM0MzV9.2koLJu6_PJQzsTlQMxtASDR5xBoGFvQU9HRE4sfKRFQ"
-)
-
-PINATA_URL = "https://api.pinata.cloud/pinning/pinJSONToIPFS"
+PINATA_JWT = os.environ.get("PINATA_JWT", "")
+PINATA_URL = "https://api.pinata.cloud/pinning/pinJSONToIPFS" [cite: 75]
 
 # ================== INICIALIZACIÓN WEB3 ==================
+
+# Verificar que las variables se cargaron
+if not RPC_URL or not PRIVATE_KEY or not CONTRACT_ADDRESS:
+    raise RuntimeError("Variables de entorno (RPC_URL, PRIVATE_KEY, CONTRACT_ADDRESS) no están configuradas.")
 
 w3 = Web3(Web3.HTTPProvider(RPC_URL))
 
 if not w3.is_connected():
-    raise RuntimeError("No se pudo conectar a Sepolia. Revisa RPC_URL / Internet.")
+    raise RuntimeError("No se pudo conectar a Sepolia. Revisa RPC_URL / Internet.") [cite: 81]
 
 account = w3.eth.account.from_key(PRIVATE_KEY)
 print("[INFO] Relayer usando cuenta:", account.address)
@@ -64,7 +56,7 @@ contract = w3.eth.contract(address=CONTRACT_ADDRESS, abi=ABI_JSON)
 
 @app.get("/")
 def root():
-    return {"status": "ok", "message": "Relayer funcionando"}
+    return {"status": "ok", "message": "Relayer funcionando"} [cite: 88]
 
 
 def subir_a_pinata(payload: dict) -> Optional[str]:
@@ -73,22 +65,22 @@ def subir_a_pinata(payload: dict) -> Optional[str]:
     Si falla, devuelve None.
     """
     if not PINATA_JWT:
-        print("[WARN] PINATA_JWT vacío, no se subirá a IPFS.")
+        print("[WARN] PINATA_JWT vacío, no se subirá a IPFS.") [cite: 91]
         return None
 
     headers = {
-        "Authorization": f"Bearer {PINATA_JWT}",
-        "Content-Type": "application/json",
+        "Authorization": f"Bearer {PINATA_JWT}", [cite: 93]
+        "Content-Type": "application/json", [cite: 94]
     }
     try:
         r = requests.post(PINATA_URL, json=payload, headers=headers, timeout=30)
         r.raise_for_status()
         res = r.json()
-        cid = res.get("IpfsHash")
-        print("[INFO] Subido a Pinata, CID:", cid)
+        cid = res.get("IpfsHash") [cite: 99]
+        print("[INFO] Subido a Pinata, CID:", cid) [cite: 100]
         return cid
     except Exception as e:
-        print("[ERROR] Error subiendo a Pinata:", e)
+        print("[ERROR] Error subiendo a Pinata:", e) [cite: 102]
         return None
 
 
@@ -103,55 +95,54 @@ async def recibir_lectura(req: Request):
         "timestamp_ms": 1731000000000
     }
     """
-    data = await req.json()
-    print("[DEBUG] Payload recibido:", data)
+    data = await req.json() [cite: 105]
+    print("[DEBUG] Payload recibido:", data) [cite: 106]
 
-    device_id = data.get("device_id", "unknown-device")
-    temp_c = float(data["temperature"])
-    hum = float(data["humidity"])
-    timestamp_ms = int(data["timestamp_ms"])
+    device_id = data.get("device_id", "unknown-device") [cite: 107]
+    temp_c = float(data["temperature"]) [cite: 108]
+    hum = float(data["humidity"]) [cite: 109]
+    timestamp_ms = int(data["timestamp_ms"]) [cite: 110]
 
     # Escalar a enteros: ej. 25.3 C -> 253, 70.1% -> 701
-    temp_times10 = int(round(temp_c * 10))
-    hum_times10 = int(round(hum * 10))
+    temp_times10 = int(round(temp_c * 10)) [cite: 113]
+    hum_times10 = int(round(hum * 10)) [cite: 115]
 
-    # 1) Subir JSON completo de la lectura a Pinata
+    # 1) Subir JSON completo de la lectura a Pinata [cite: 116]
     pinata_payload = {
         "device_id": device_id,
         "temperature_c": temp_c,
         "humidity_percent": hum,
         "timestamp_ms": timestamp_ms,
     }
-    cid = subir_a_pinata(pinata_payload) or ""
+    cid = subir_a_pinata(pinata_payload) or "" [cite: 118]
 
     # 2) Construir transacción a storeReading(...)
-    nonce = w3.eth.get_transaction_count(account.address)
+    nonce = w3.eth.get_transaction_count(account.address) [cite: 125]
 
     tx = contract.functions.storeReading(
         device_id, temp_times10, hum_times10, timestamp_ms, cid
-    ).build_transaction(
+    ).build_transaction( [cite: 126-127]
         {
-            "from": account.address,
-            "nonce": nonce,
-            "gas": 300000,
-            "gasPrice": w3.eth.gas_price,
-            "chainId": CHAIN_ID,
+            "from": account.address, [cite: 130]
+            "nonce": nonce, [cite: 131]
+            "gas": 300000, [cite: 132]
+            "gasPrice": w3.eth.gas_price, [cite: 133]
+            "chainId": CHAIN_ID, [cite: 134]
         }
     )
 
-    signed_tx = w3.eth.account.sign_transaction(tx, private_key=PRIVATE_KEY)
+    signed_tx = w3.eth.account.sign_transaction(tx, private_key=PRIVATE_KEY) [cite: 137]
 
-    # ⚠️ CAMBIO IMPORTANTE PARA web3 7.x:
-    # antes: signed_tx.rawTransaction
-    tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+    # Web3.py 7.x usa 'raw_transaction'
+    tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction) [cite: 140]
 
-    print("[INFO] Tx enviada:", tx_hash.hex())
-    receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
-    print("[INFO] Tx minada en bloque:", receipt.blockNumber)
+    print("[INFO] Tx enviada:", tx_hash.hex()) [cite: 141]
+    receipt = w3.eth.wait_for_transaction_receipt(tx_hash) [cite: 143]
+    print("[INFO] Tx minada en bloque:", receipt.blockNumber) [cite: 144]
 
     return {
         "status": "ok",
-        "tx_hash": tx_hash.hex(),
-        "block": receipt.blockNumber,
-        "cid": cid,
+        "tx_hash": tx_hash.hex(), [cite: 147]
+        "block": receipt.blockNumber, [cite: 148]
+        "cid": cid, [cite: 150]
     }
