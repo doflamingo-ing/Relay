@@ -121,7 +121,7 @@ async def recibir_lectura(req: Request):
 
     tx = contract.functions.storeReading(
         device_id, temp_times10, hum_times10, timestamp_ms, cid
-    ).build_transaction( [cite: 126-127]
+    ).build_transaction( 
         {
             "from": account.address, 
             "nonce": nonce, 
